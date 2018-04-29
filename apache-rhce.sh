@@ -5,8 +5,8 @@
 
 INSTALLPACKAGES="httpd firewalld openssl mod_ssl"
 REMOVEPACKAGES="httpd httpd-tools"
-PUBLICIP=`curl -s http://ifconfig.me`
-PRIVATEIP=`hostname -I`
+PUBLICIP=54.187.174.5
+PRIVATEIP=172.31.30.29
 SERVER1="server1.myserver.com"
 SERVER2="server2.myserver.com"
 
