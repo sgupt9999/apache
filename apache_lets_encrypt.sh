@@ -119,6 +119,17 @@ cat /tmp/output | sed -n "s/subject.*/&/p"
 echo "#############################################################################################################"
 sleep 5
 
+if yum list installed certbot > /dev/null 2>&1
+then
+	echo
+	echo "#################################################"
+	echo "Removing all copies of certbot.................."
+	yum remove -y -q $INSTALLPACKAGES3 > /dev/null 2>&1
+	rm -rf /etc/letsencrypt
+	echo "Done"
+	echo "#################################################"
+fi
+
 
 echo
 echo "######################################################"
@@ -129,9 +140,10 @@ echo "######################################################"
 
 # Need a VirtualHost declaration, otherwise the Let's Encrypt challenege gives an error
 echo "<VirtualHost *:80>" >> /etc/httpd/conf/httpd.conf
+echo "	ServerName $DOMAIN" >> /etc/httpd/conf/httpd.conf
 echo "</VirtualHost>" >> /etc/httpd/conf/httpd.conf
 
-certbot -n --apache -d $DOMAIN --agree-tos -m $ADMIN_EMAIL
+certbot -n --apache -d $DOMAIN --agree-tos -m $ADMIN_EMAIL > /dev/null 2>&1
 
 echo
 echo "#############################################################################################################"
@@ -147,4 +159,7 @@ echo
 echo  "This is the subject from the Let's Encrypt  certificate----->"
 sleep 5
 cat /tmp/output | sed -n "s/subject.*/&/p"
+echo
+echo "And the issuer of the certificate --------->"
+cat /tmp/output | sed -n "s/issuer.*/&/p"
 echo "#############################################################################################################"
