@@ -11,7 +11,8 @@ ADMIN_EMAIL="sgupt9999@gmail.com"
 # End of user inputs
 
 INSTALLPACKAGES="httpd"
-INSTALLPACKAGES2="openssl mod-ssl certbot python2-certbot-apache"
+INSTALLPACKAGES2="openssl mod_ssl"
+INSTALLPACKAGES3="certbot python2-certbot-apache"
 
 if [[ $EUID != 0 ]]
 then
@@ -94,9 +95,56 @@ sleep 5
 
 echo
 echo "######################################################"
-echo "Installing packages for Let's Encrypt SSL certificate"
-yum install -y $INSTALLPACKAGES2
+echo "Installing mod_ssl package"
+yum install  $INSTALLPACKAGES2 -y -q > /dev/null 2>&1
 echo "Done"
 echo "######################################################"
 
 systemctl restart httpd
+
+echo
+echo "#############################################################################################################"
+echo "Mod_ssl was installed. It also creates a default self signed certificate as part of installation"
+echo "#############################################################################################################"
+sleep 5
+echo "curl https://$DOMAIN ----------->  "
+echo
+curl https://$DOMAIN
+echo "#############################################################################################################"
+curl -v https://$DOMAIN &>/tmp/output
+echo
+echo  "This is the subject from the default self signed certificate----->"
+sleep 5
+cat /tmp/output | sed -n "s/subject.*/&/p"
+echo "#############################################################################################################"
+sleep 5
+
+
+echo
+echo "######################################################"
+echo "Installing certbot packages for Lets Encrypt certificate"
+yum install  $INSTALLPACKAGES3 -y -q > /dev/null 2>&1
+echo "Done"
+echo "######################################################"
+
+# Need a VirtualHost declaration, otherwise the Let's Encrypt challenege gives an error
+echo "<VirtualHost *:80>" >> /etc/httpd/conf/httpd.conf
+echo "</VirtualHost>" >> /etc/httpd/conf/httpd.conf
+
+certbot -n --apache -d $DOMAIN --agree-tos -m $ADMIN_EMAIL
+
+echo
+echo "#############################################################################################################"
+echo "Let's encrypt certificate installed."
+echo "#############################################################################################################"
+sleep 5
+echo "curl https://$DOMAIN ----------->  "
+echo
+curl https://$DOMAIN
+echo "#############################################################################################################"
+curl -v https://$DOMAIN &>/tmp/output
+echo
+echo  "This is the subject from the Let's Encrypt  certificate----->"
+sleep 5
+cat /tmp/output | sed -n "s/subject.*/&/p"
+echo "#############################################################################################################"
