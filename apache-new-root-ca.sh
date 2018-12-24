@@ -1,12 +1,9 @@
 #!/bin/bash
 
-# Testing why is the beavior incosistent with self signed CA
-# Tested on AWS and Linux Academy and works on public ip, private ip and the hostname. The hostname doesnt have to be the same as FQDN
+# Testing creating self-signed certificate with a new root authority
+# checked on both linuxacademy and AWS and works fine
 
-
-#CN="garfield99996.mylabserver.com"
-CN=18.223.152.146
-IPSERVER=172.31.31.177
+CN="garfield99994d.mylabserver.com"
 FILE="/etc/httpd/conf/httpd.conf"
 
 
@@ -24,13 +21,9 @@ rm -rf /etc/pki/tls/certs/rootca.*
 rm -rf /etc/pki/tls/certs/mylabserver.*
 cd /etc/pki/tls/certs
 openssl genpkey -out rootca.key -algorithm RSA -pkeyopt rsa_keygen_bits:4096
-#openssl req -x509 -days 365 -out rootca.crt -subj "/OU=RootAgency/CN=RootAgency/emailAddress=admin@rootagency.com" -set_serial 100 -key ./rootca.key
-openssl req -x509 -days 365 -out rootca.crt -subj "/OU=RootAgency/CN=RootAgency20dgdgdg00" -set_serial 101 -key ./rootca.key
-#openssl req -newkey rsa:2048 -out mylabserver.csr -subj "/OU=CMEI1/CN=$CN" -nodes -keyout mylabserver.key
+openssl req -x509 -days 365 -out rootca.crt -subj "/OU=RootAgency/CN=RootAgency" -set_serial 101 -key ./rootca.key
 
-
-# Need to specify the CN value here. If coming from a variable keeps giving an error
-openssl req -newkey rsa:2048 -out mylabserver.csr -subj "/OU=CMEI1/CN=18.223.152.146" -nodes -keyout mylabserver.key 
+openssl req -newkey rsa:2048 -out mylabserver.csr -subj "/OU=CMEI1/CN=$CN" -nodes -keyout mylabserver.key
 openssl x509 -req -days 365 -CA ./rootca.crt -CAkey ./rootca.key -out mylabserver.crt -set_serial 501 -in mylabserver.csr
 chmod 0600 *.key
 
@@ -48,21 +41,48 @@ echo "This is the test directory" > /test/index.html
 semanage fcontext -a -t httpd_sys_content_t "/test(/.*)?"
 restorecon -r /test
 
+# Make a backup of the default ssl.conf and create a custom file
+mv /etc/httpd/conf.d/ssl.conf /etc/httpd/conf.d/ssl.conf.orig 
 
-echo "<VirtualHost $IPSERVER:443>" >> $FILE
-echo "        DocumentRoot /test" >> $FILE
-echo    "SSLEngine on" >> $FILE
-echo    "SSLCertificateFile /etc/pki/tls/certs/mylabserver.crt" >> $FILE
-echo    "SSLCertificateKeyFile /etc/pki/tls/certs/mylabserver.key" >> $FILE
-echo    "</VirtualHost>" >> $FILE
-echo    "<Directory /test>" >> $FILE
-echo    "require all granted" >> $FILE
-echo    "</Directory>" >> $FILE
+cat >/etc/httpd/conf.d/ssl.conf <<EOF
+Listen 443 https
+SSLPassPhraseDialog exec:/usr/libexec/httpd-ssl-pass-dialog
+SSLSessionCache         shmcb:/run/httpd/sslcache(512000)
+SSLSessionCacheTimeout  300
+SSLRandomSeed startup file:/dev/urandom  256
+SSLRandomSeed connect builtin
+SSLCryptoDevice builtin
+SSLStrictSNIVHostCheck on
 
+<VirtualHost *:443>
+DocumentRoot /test
+ServerName $CN
+SSLEngine on
+SSLCertificateFile /etc/pki/tls/certs/mylabserver.crt
+SSLCertificateKeyFile /etc/pki/tls/certs/mylabserver.key
+SSLProtocol all -SSLv2 -SSLv3
+SSLCipherSuite HIGH:3DES:!aNULL:!MD5:!SEED:!IDEA
+<Files ~ "\.(cgi|shtml|phtml|php3?)$">
+    SSLOptions +StdEnvVars
+</Files>
+<Directory "/var/www/cgi-bin">
+    SSLOptions +StdEnvVars
+</Directory>
+BrowserMatch "MSIE [2-5]" \
+         nokeepalive ssl-unclean-shutdown \
+         downgrade-1.0 force-response-1.0
+CustomLog logs/ssl_request_log \
+          "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
+</VirtualHost>
+
+<Directory /test>
+	require all granted
+</Directory>
+
+EOF
 
 systemctl restart httpd
 clear
-
 
 echo "curl https://$CN"
 curl https://$CN
